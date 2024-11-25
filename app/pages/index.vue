@@ -50,7 +50,7 @@
 					</ul>
 				</div>
 			</div>
-			<div class="relative mb-4">
+			<div class="relative my-4">
 				<button
 					@click="showFavoriteDropdown = !showFavoriteDropdown"
 					:disabled="isFavoritesDisabled"

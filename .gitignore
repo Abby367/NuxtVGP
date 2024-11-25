@@ -142,3 +142,4 @@ public/styleguide
 
 # VS code
 .vscode
+.vercel
