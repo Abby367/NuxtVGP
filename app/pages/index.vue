@@ -250,6 +250,7 @@ const query = gql`
 			rocket {
 				rocket_name
 				rocket {
+					id
 					name
 					description
 					first_flight
@@ -269,6 +270,29 @@ const query = gql`
 	}
 `
 
+interface Launch {
+	id: string
+	mission_name: string
+	launch_date_local: string
+	details?: string
+	launch_site?: {
+		site_name: string
+	}
+	rocket?: {
+		id: string
+		rocket_name: string
+		rocket?: {
+			name: string
+			description: string
+			first_flight: string
+			height: { feet: number }
+			diameter: { feet: number }
+			mass: { kg: number }
+			stages: number
+		}
+	}
+}
+
 // Use the favorites store
 const favoritesStore = useFavoritesStore()
 const showFavoriteDropdown = ref(false)
@@ -281,7 +305,7 @@ const favoriteIds = computed(() => new Set(favoriteLaunches.value.map((launch) =
 const favoriteCount = computed(() => favoriteLaunches.value.length)
 
 // Add or remove a launch from favorites
-const toggleFavorite = (launch) => {
+const toggleFavorite = (launch: Launch) => {
 	if (isFavorite(launch)) {
 		favoritesStore.favoriteLaunches = favoritesStore.favoriteLaunches.filter(
 			(fav) => fav.id !== launch.id,
@@ -291,10 +315,23 @@ const toggleFavorite = (launch) => {
 	}
 }
 
+// Show only favorites
+const showOnlyFavorites = ref(false)
+const showFavorites = () => {
+	showOnlyFavorites.value = true // Enable the favorites-only mode
+	currentPage.value = 1 // Reset pagination to show the first page of favorites
+}
+
+// Clear favorites list
+const clearFavoritesFilter = () => {
+	window.location.reload()
+}
+
 // Check if a launch is in favorites
-const isFavorite = (launch) => favoriteIds.value.has(launch.id)
+const isFavorite = (launch: Launch) => favoriteIds.value.has(launch.id)
 
 const isFavoritesDisabled = computed(() => favoriteCount.value === 0)
+
 // Fetch data from GraphQL
 const { result, loading, error } = useQuery(query)
 const launches = computed(() => result.value?.launches ?? [])
@@ -306,9 +343,16 @@ const currentPage = ref(1)
 const totalPages = computed(() => Math.ceil(sortedLaunches.value.length / itemsPerPage))
 
 const paginatedLaunches = computed(() => {
+	const sourceLaunches = showOnlyFavorites.value ? favoriteLaunches.value : sortedLaunches.value
 	const start = (currentPage.value - 1) * itemsPerPage
-	return sortedLaunches.value.slice(start, start + itemsPerPage)
+	return sourceLaunches.slice(start, start + itemsPerPage)
 })
+watch(
+	() => showOnlyFavorites.value,
+	() => {
+		currentPage.value = 1 // Reset to the first page when toggling "Show Favorites"
+	},
+)
 
 // Pagination Controls
 const hasNextPage = computed(() => currentPage.value < totalPages.value)
@@ -331,20 +375,28 @@ const availableYears = computed(() => [
 ])
 
 // Filter by year
-const selectedYear = ref(null)
+const selectedYear = ref<number | null>(null)
 
 // Filtered launches considering favorite launches as well
-const filteredLaunches = computed(() =>
-	launches.value.filter((launch) => {
+const filteredLaunches = computed(() => {
+	return launches.value.filter((launch) => {
 		const matchesYear =
 			!selectedYear.value || new Date(launch.launch_date_local).getFullYear() === selectedYear.value
 		const isFavoriteLaunch = favoriteIds.value.has(launch.id)
 		return matchesYear && (showOnlyFavorites.value ? isFavoriteLaunch : true)
-	}),
+	})
+})
+
+watch(
+	() => favoritesStore.favoriteLaunches,
+	() => {
+		favoriteIds.value = new Set(favoritesStore.favoriteLaunches.map((launch) => launch.id))
+	},
+	{ deep: true },
 )
 
 // Sorting by launch date
-const sortOrder = ref('asc') // Default sorting order
+const sortOrder = ref<'asc' | 'desc'>('asc') // Default sorting order
 const sortedLaunches = computed(() => {
 	return [...filteredLaunches.value].sort((a, b) => {
 		const dateA = new Date(a.launch_date_local).getTime()
@@ -359,38 +411,26 @@ watch([selectedYear, sortOrder], () => {
 })
 
 // For collapsible section
-const expandedRocketIds = ref(new Set()) // Track expanded rocket details for multiple launches
+const expandedRocketIds = ref(new Set<string>()) // Track expanded rocket details for multiple launches
 
-const viewRocket = (launch) => {
+const viewRocket = (launch: Launch) => {
 	if (expandedRocketIds.value.has(launch.id)) {
-		expandedRocketIds.value.delete(launch.id) // Close the details if it's already open
+		expandedRocketIds.value.delete(launch.id)
 	} else {
-		expandedRocketIds.value.add(launch.id) // Open the details for this launch
+		expandedRocketIds.value.add(launch.id)
 	}
 }
 
 const showYearDropdown = ref(false) // Controls visibility of the dropdown
 
 // Function to handle year selection
-const selectYear = (year) => {
+const selectYear = (year: number | null) => {
 	selectedYear.value = year // Update selected year
 	showYearDropdown.value = false // Close the dropdown
 }
 
 const toggleSortOrder = () => {
 	sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-}
-
-// Show only favorites
-const showOnlyFavorites = ref(false)
-
-const showFavorites = () => {
-	showOnlyFavorites.value = true // Filter to show only favorites
-}
-
-// Clear favorites list
-const clearFavoritesFilter = () => {
-	window.location.reload()
 }
 </script>
 
