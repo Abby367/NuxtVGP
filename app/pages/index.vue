@@ -390,8 +390,7 @@ const showFavorites = () => {
 
 // Clear favorites list
 const clearFavoritesFilter = () => {
-	favoritesStore.favoriteLaunches = []
-	showFavoriteDropdown.value = false
+	window.location.reload()
 }
 </script>
 
